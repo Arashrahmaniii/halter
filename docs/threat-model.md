@@ -33,7 +33,9 @@
 | Owner unknowingly approves a payment to an account confirmed as a scam after the request | `approve` re-runs the registry check | unit test `owner_approval_rechecks_the_registry` |
 | Two concurrent requests both fitting under the limit | reservation at `execute` time | unit test `concurrent_requests_cannot_both_squeeze_under_the_limit` |
 | Registry down or returning garbage | wallet blocks (fail closed) | unit test `registry_failure_fails_closed` |
-| Gas-allowance exhaustion locks the agent out | owner adds a new key through the contract | `add_agent_key` |
+| Gas-allowance exhaustion locks the agent out | owner adds a new key through the contract | `add_agent_key`, `npm run owner -- rotate-key` |
+| Storage griefing: a key holder makes the wallet store large data (storage is paid from the wallet's balance) | size caps on call args, memos, reasons; bounded history (100), queue (20), rate-limited proposals; expired approvals pruned | self-audit regression tests |
+| The agent key is public | by design on the red-team page: the worst a key holder can do is spend the key's gas allowance, which NEAR caps | `web/redteam.html` |
 
 ## Out of scope / known limits
 

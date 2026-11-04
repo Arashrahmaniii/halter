@@ -642,3 +642,108 @@ fn json_shape_of_actions_is_tagged() {
     .unwrap();
     assert_eq!(a, pay(ALICE, U128(1000)));
 }
+
+// ------------------------------------------------------------------ self-audit regressions
+
+#[test]
+fn proposals_count_against_rate_limit_and_queue_cap() {
+    let mut w = setup(false);
+    as_owner(T0_MS);
+    let mut p = w.get_policy();
+    p.max_actions_per_hour = 3;
+    w.set_policy(p);
+    for i in 0..3 {
+        as_agent(T0_MS + i);
+        assert_eq!(w.propose(pay(ALICE, milli(1)), "x".into(), None).status, Status::Pending);
+    }
+    as_agent(T0_MS + 10);
+    let o = w.propose(pay(ALICE, milli(1)), "x".into(), None);
+    assert_eq!(o.status, Status::Blocked);
+    assert!(o.reasons[0].contains("rate limit"));
+
+    // Queue cap: with a generous rate limit the queue still stops at MAX_PENDING.
+    as_owner(T0_MS + 2 * HOUR_MS);
+    let mut p = w.get_policy();
+    p.max_actions_per_hour = 120;
+    w.set_policy(p);
+    for i in 0..(MAX_PENDING as u64) {
+        as_agent(T0_MS + 2 * HOUR_MS + i);
+        w.propose(pay(ALICE, milli(1)), "x".into(), None);
+    }
+    assert_eq!(w.get_pending().len() as u32, MAX_PENDING);
+    as_agent(T0_MS + 2 * HOUR_MS + 100);
+    let o = w.propose(pay(ALICE, milli(1)), "x".into(), None);
+    assert!(o.reasons.iter().any(|r| r.contains("too many pending")));
+    assert_eq!(w.get_pending().len() as u32, MAX_PENDING);
+}
+
+#[test]
+fn expired_approvals_leave_the_queue() {
+    let mut w = setup(false);
+    as_agent(T0_MS);
+    let first = value(w.execute(pay("newshop.testnet", milli(10)), None)).id;
+    assert_eq!(w.get_pending().len(), 1);
+    as_agent(T0_MS + 25 * HOUR_MS);
+    w.execute(pay(ALICE, milli(10)), None);
+    assert!(w.get_pending().is_empty());
+    assert_eq!(w.get_decision(first).unwrap().status, Status::Expired);
+}
+
+#[test]
+#[should_panic(expected = "Call arguments too large")]
+fn oversized_call_args_are_refused_before_storage() {
+    let mut w = setup(false);
+    as_agent(T0_MS);
+    w.execute(
+        Action::Call {
+            contract_id: acc("x.testnet"),
+            method_name: "m".into(),
+            args: Base64VecU8(vec![0u8; 50_000]),
+            deposit: U128(0),
+            gas: U64(Gas::from_tgas(10).as_gas()),
+        },
+        None,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Memo too long")]
+fn oversized_ft_memo_is_refused() {
+    let mut w = setup(false);
+    as_agent(T0_MS);
+    w.execute(
+        Action::FtTransfer { token_id: acc("usdc.testnet"), receiver_id: acc(ALICE), amount: U128(1), memo: Some("m".repeat(5000)) },
+        None,
+    );
+}
+
+#[test]
+fn agent_reports_cannot_denylist_contacts() {
+    let mut w = setup(true);
+    as_agent(T0_MS);
+    w.report_scam(acc(ALICE), "Other".into(), "e".into());
+    assert!(!w.get_denylist().contains(&acc(ALICE)));
+    w.report_scam(acc("evil.testnet"), "Drainer".into(), "e".into());
+    assert!(w.get_denylist().contains(&acc("evil.testnet")));
+}
+
+#[test]
+fn ownership_moves_in_two_steps() {
+    let mut w = setup(false);
+    as_owner(T0_MS);
+    w.propose_owner(acc("newowner.testnet"));
+    assert_eq!(w.get_status().owner_id, acc(OWNER));
+    ctx("newowner.testnet", rogue_pk(), T0_MS, vec![]);
+    w.accept_owner();
+    assert_eq!(w.get_status().owner_id, acc("newowner.testnet"));
+}
+
+#[test]
+#[should_panic(expected = "Only the proposed owner")]
+fn strangers_cannot_accept_ownership() {
+    let mut w = setup(false);
+    as_owner(T0_MS);
+    w.propose_owner(acc("newowner.testnet"));
+    ctx("mallory.testnet", rogue_pk(), T0_MS, vec![]);
+    w.accept_owner();
+}

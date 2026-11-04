@@ -34,6 +34,13 @@ const WINDOW_HOURS: u64 = 24;
 const HISTORY_LEN: u64 = 100;
 const MAX_PENDING: u32 = 20;
 const MAX_MEMO_LEN: usize = 256;
+/// Call arguments are stored in the history and the approval queue, and NEAR charges storage to
+/// the wallet's own balance, so their size is capped (storage-griefing guard).
+const MAX_ARGS_LEN: usize = 2048;
+const MAX_METHOD_LEN: usize = 64;
+const MAX_CATEGORY_LEN: usize = 32;
+const MAX_EVIDENCE_LEN: usize = 512;
+const PRUNE_PER_CALL: usize = 5;
 const MAX_ACTIONS_PER_HOUR_CAP: u32 = 120;
 const DEFAULT_PENDING_TTL_MS: u64 = 24 * HOUR_MS;
 
@@ -350,6 +357,7 @@ enum Verdict {
 #[derive(PanicOnDefault)]
 pub struct LeashWallet {
     owner_id: AccountId,
+    proposed_owner: Option<AccountId>,
     guardians: IterableSet<AccountId>,
     policy: Policy,
     frozen: bool,
@@ -418,6 +426,7 @@ impl LeashWallet {
             seen: LookupSet::new(StorageKey::Seen),
             spend: LookupMap::new(StorageKey::Spend),
             recent_actions: vec![],
+            proposed_owner: None,
             pending: IterableMap::new(StorageKey::Pending),
             in_flight: LookupMap::new(StorageKey::InFlight),
             history: LookupMap::new(StorageKey::History),
@@ -431,6 +440,8 @@ impl LeashWallet {
     pub fn execute(&mut self, action: Action, memo: Option<String>) -> PromiseOrValue<Outcome> {
         let who = self.assert_agent();
         check_memo(&memo);
+        validate_action(&action);
+        self.prune_expired();
         let id = self.take_id();
 
         let verdict = self.evaluate(&action, true);
@@ -464,15 +475,24 @@ impl LeashWallet {
         let who = self.assert_agent();
         check_memo(&memo);
         require!(reason.len() <= MAX_MEMO_LEN, "Reason too long");
+        validate_action(&action);
+        self.prune_expired();
         let id = self.take_id();
-        match self.evaluate(&action, false) {
-            Verdict::Block(reasons) => self.record_blocked(id, action, reasons, who, memo),
+        // Proposals cost the wallet storage, so they count against the rate limit (checked in
+        // `evaluate`) and the approval-queue cap like any other action.
+        if self.pending.len() >= MAX_PENDING {
+            return self.record_blocked(id, action, vec!["too many pending approvals".into()], who, memo);
+        }
+        let reasons = match self.evaluate(&action, false) {
+            Verdict::Block(reasons) => return self.record_blocked(id, action, reasons, who, memo),
             Verdict::NeedsApproval(mut reasons) => {
                 reasons.insert(0, format!("agent asked: {reason}"));
-                self.park(id, action, reasons, who, memo)
+                reasons
             }
-            Verdict::Allow => self.park(id, action, vec![format!("agent asked: {reason}")], who, memo),
-        }
+            Verdict::Allow => vec![format!("agent asked: {reason}")],
+        };
+        self.note_action();
+        self.park(id, action, reasons, who, memo)
     }
 
     /// The agent reports a scam account to the shared registry. The 0.01 NEAR bond counts
@@ -480,6 +500,8 @@ impl LeashWallet {
     pub fn report_scam(&mut self, account_id: AccountId, category: String, evidence: String) -> Promise {
         self.assert_agent();
         require!(!self.frozen, "Wallet is frozen");
+        require!(category.len() <= MAX_CATEGORY_LEN, "Category too long");
+        require!(evidence.len() <= MAX_EVIDENCE_LEN, "Evidence too long");
         let registry = self.policy.registry_id.clone().expect("No registry configured");
         let probe = Action::Transfer {
             receiver_id: registry.clone(),
@@ -491,8 +513,12 @@ impl LeashWallet {
         self.check_rate(&mut reasons);
         require!(reasons.is_empty(), reasons.join("; "));
         self.add_spend(NEAR_ASSET, now_hour, REPORT_BOND.as_yoctonear());
-        self.recent_actions.push(env::block_timestamp_ms());
-        self.denylist.insert(account_id.clone());
+        self.note_action();
+        // The agent can protect the wallet from an account, but cannot lock out a contact the
+        // owner chose to trust.
+        if !self.contacts.contains(&account_id) {
+            self.denylist.insert(account_id.clone());
+        }
         emit("report", json!({ "account_id": account_id, "category": category, "evidence": evidence }));
         Promise::new(registry).function_call(
             "report",
@@ -708,10 +734,19 @@ impl LeashWallet {
         self.dispatch(id, &action)
     }
 
-    pub fn set_owner(&mut self, owner_id: AccountId) {
+    /// Two-step ownership transfer: the current owner proposes, the new owner accepts.
+    pub fn propose_owner(&mut self, owner_id: AccountId) {
         self.assert_owner();
-        emit("owner_changed", json!({ "from": self.owner_id, "to": owner_id }));
-        self.owner_id = owner_id;
+        emit("owner_proposed", json!({ "from": self.owner_id, "to": owner_id }));
+        self.proposed_owner = Some(owner_id);
+    }
+
+    pub fn accept_owner(&mut self) {
+        let who = env::predecessor_account_id();
+        require!(self.proposed_owner.as_ref() == Some(&who), "Only the proposed owner");
+        emit("owner_changed", json!({ "from": self.owner_id, "to": who }));
+        self.owner_id = who;
+        self.proposed_owner = None;
     }
 
     // ================================================================== views
@@ -972,6 +1007,35 @@ impl LeashWallet {
         self.spend.insert(asset, w);
     }
 
+    /// Count one action against the rolling-hour rate limit (bounded list).
+    fn note_action(&mut self) {
+        let now = env::block_timestamp_ms();
+        let cutoff = now.saturating_sub(HOUR_MS);
+        self.recent_actions.retain(|t| *t > cutoff);
+        self.recent_actions.push(now);
+        if self.recent_actions.len() > MAX_ACTIONS_PER_HOUR_CAP as usize {
+            self.recent_actions.remove(0);
+        }
+    }
+
+    /// Move a few expired approvals out of the queue so stale entries cannot fill it forever.
+    fn prune_expired(&mut self) {
+        let now = env::block_timestamp_ms();
+        let expired: Vec<u64> = self
+            .pending
+            .iter()
+            .filter(|(_, p)| p.expires_at_ms.0 < now)
+            .map(|(id, _)| *id)
+            .take(PRUNE_PER_CALL)
+            .collect();
+        for id in expired {
+            self.pending.remove(&id);
+            if self.history.contains_key(&id) {
+                self.update(id, Status::Expired, vec!["approval window expired".into()]);
+            }
+        }
+    }
+
     /// Track an action across the async registry check and settlement.
     ///
     /// With `reserve`, the action is counted against the window and the rate limit *now*,
@@ -981,12 +1045,7 @@ impl LeashWallet {
         let hour = now_hour();
         if reserve {
             self.add_spend(&action.asset(), hour, action.amount());
-            let cutoff = env::block_timestamp_ms().saturating_sub(HOUR_MS);
-            self.recent_actions.retain(|t| *t > cutoff);
-            self.recent_actions.push(env::block_timestamp_ms());
-            if self.recent_actions.len() > MAX_ACTIONS_PER_HOUR_CAP as usize {
-                self.recent_actions.remove(0);
-            }
+            self.note_action();
         }
         self.in_flight.insert(
             id,
@@ -1140,6 +1199,18 @@ fn now_hour() -> u64 {
 fn check_memo(memo: &Option<String>) {
     if let Some(m) = memo {
         require!(m.len() <= MAX_MEMO_LEN, "Memo too long");
+    }
+}
+
+/// Size limits on everything an action stores (storage-griefing guard).
+fn validate_action(action: &Action) {
+    match action {
+        Action::FtTransfer { memo, .. } => check_memo(memo),
+        Action::Call { method_name, args, .. } => {
+            require!(!method_name.is_empty() && method_name.len() <= MAX_METHOD_LEN, "Method name too long");
+            require!(args.0.len() <= MAX_ARGS_LEN, "Call arguments too large (max 2048 bytes)");
+        }
+        Action::Transfer { .. } => {}
     }
 }
 

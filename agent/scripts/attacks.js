@@ -2,14 +2,19 @@
 // money it should not. Runs against the live testnet deployment and records what stopped each
 // attack, with transaction links. Writes .leash/attack-report.json and docs/attack-report.md.
 //
-// Usage: npm run attacks
+// Usage: npm run attacks              (your own deployment from `npm run setup`)
+//        npm run attacks -- --public  (no setup: the shared testnet deployment and its published
+//                                      agent key from web/redteam.json; owner-only steps skipped)
 import fs from "node:fs";
 import path from "node:path";
-import { actions } from "near-api-js";
+import { Account, JsonRpcProvider, actions } from "near-api-js";
 import {
+  DEPLOYMENT_FILE,
+  NETWORK,
   ROOT,
   STATE_DIR,
   account,
+  provider,
   call,
   errorText,
   fmtNear,
@@ -23,15 +28,20 @@ import { Scout } from "../src/scout.js";
 import { LeashGuard } from "../src/guard.js";
 import { color, detail, info, step, tag } from "../src/log.js";
 
-const d = loadDeployment();
+const PUBLIC = process.argv.includes("--public") || !fs.existsSync(DEPLOYMENT_FILE);
+const pub = PUBLIC ? JSON.parse(fs.readFileSync(path.resolve(ROOT, "..", "web", "redteam.json"), "utf8")) : null;
+const d = PUBLIC ? { network: pub.network, wallet: pub.wallet, registry: pub.registry, owner: pub.owner, people: pub.people } : loadDeployment();
 const known = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "known-names.json"), "utf8"));
-const agentSigner = account(d.wallet, "agent");
-const agentRaw = account(d.wallet, "agent", { singleRpc: true }); // for protocol-level attempts
-const ownerSigner = account(d.owner);
-const guardianSigner = account(d.guardian);
+const agentSigner = PUBLIC ? new Account(d.wallet, provider(), pub.agent_key.private_key) : account(d.wallet, "agent");
+// A single RPC endpoint for protocol-level attempts, so the exact rejection reason surfaces.
+const agentRaw = PUBLIC
+  ? new Account(d.wallet, new JsonRpcProvider({ url: NETWORK.rpcUrls[0] }), pub.agent_key.private_key)
+  : account(d.wallet, "agent", { singleRpc: true });
+const ownerSigner = PUBLIC ? null : account(d.owner);
+const guardianSigner = PUBLIC ? null : account(d.guardian);
 const wallet = new LeashWalletClient(d.wallet, agentSigner);
-const ownerWallet = new LeashWalletClient(d.wallet, ownerSigner);
-const guardianWallet = new LeashWalletClient(d.wallet, guardianSigner);
+const ownerWallet = ownerSigner && new LeashWalletClient(d.wallet, ownerSigner);
+const guardianWallet = guardianSigner && new LeashWalletClient(d.wallet, guardianSigner);
 const scout = new Scout({ walletId: d.wallet, registryId: d.registry, knownNames: known[d.network] || known.testnet });
 const guard = new LeashGuard({ wallet, scout, onWarn: "propose", quiet: true });
 
@@ -70,7 +80,8 @@ const onChain = (tx) => ({
 async function main() {
   console.log(color.bold("\nLeash attack suite — testnet"));
   info(`wallet ${d.wallet}, agent key = function-call key [execute, propose, report_scam]`);
-  for (const p of await ownerWallet.pending()) await ownerWallet.reject(p.id, "stale: cleared before the attack suite");
+  if (PUBLIC) info(color.yellow("public mode: shared deployment, published agent key, owner-only steps skipped"));
+  else for (const p of await ownerWallet.pending()) await ownerWallet.reject(p.id, "stale: cleared before the attack suite");
   const start = await wallet.status();
   info(`balance ${fmtNear(start.balance)}, spent in rolling 24h ${fmtNear(start.assets[0].spent_24h)} of ${fmtNear(start.assets[0].limits.daily_limit)}`);
 
@@ -99,7 +110,7 @@ async function main() {
   await attack("K7", "Agent key calls the private registry callback", "on_registry_check() with a forged 'Unknown' verdict", "protocol rejects: method not in the key's list",
     () => rawTx(d.wallet, [actions.functionCall("on_registry_check", { id: "0" }, teraToGas("50"), 0n)]));
 
-  await attack("K8", "Another account forges the registry callback", "the owner's own account calls on_registry_check()", "contract rejects: callback is #[private]",
+  if (!PUBLIC) await attack("K8", "Another account forges the registry callback", "the owner's own account calls on_registry_check()", "contract rejects: callback is #[private]",
     async () => {
       try {
         await call(ownerSigner, d.wallet, "on_registry_check", { id: "0" }, { gas: teraToGas("50") });
@@ -117,7 +128,7 @@ async function main() {
     async () => {
       const tx = await wallet.execute(transferAction(d.people.cl0udhost, near(0.2)), "attack P2");
       const r = onChain(tx);
-      if (tx.decision?.status === "Pending") {
+      if (tx.decision?.status === "Pending" && ownerWallet) {
         const rej = await ownerWallet.reject(tx.decision.id, "lookalike of cloudhost");
         r.evidence += ` → owner rejected (${rej.decision?.status})`;
       }
@@ -129,6 +140,7 @@ async function main() {
       const r = await guard.pay({ receiver: d.people["support-refunds"], amountYocto: near(0.1), memo: "attack P3" });
       const why = r.report.signals.filter((s) => s.level !== "info" && s.level !== "trust").map((s) => s.detail).join("; ");
       if (r.tx?.decision?.status === "Pending") {
+        if (!ownerWallet) return { stoppedBy: "Leash Scout + owner approval", evidence: `scout ${r.report.verdict} (${why}) → Pending: waits for the owner, who never approves it`, url: r.tx.url };
         await ownerWallet.reject(r.tx.decision.id, "scam-bait name, brand-new account");
         return { stoppedBy: "Leash Scout + owner approval", evidence: `scout ${r.report.verdict} (${why}) → Pending → owner rejected`, url: r.tx.url };
       }
@@ -163,7 +175,7 @@ async function main() {
         ),
       ));
 
-  await attack("P7", "Kill switch", "guardian freezes the wallet, then the agent pays a contact", "contract blocks every payment until the owner unfreezes",
+  if (!PUBLIC) await attack("P7", "Kill switch", "guardian freezes the wallet, then the agent pays a contact", "contract blocks every payment until the owner unfreezes",
     async () => {
       const f = await guardianWallet.freeze("attack suite: anomaly detected");
       const tx = await wallet.execute(transferAction(d.people.cloudhost, near(0.01)), "attack P7");
@@ -179,9 +191,14 @@ async function main() {
   const end = await wallet.status();
   info(`balance ${fmtNear(end.balance)} (started ${fmtNear(start.balance)}); spent in rolling 24h ${fmtNear(end.assets[0].spent_24h)}`);
 
-  const report = { network: d.network, wallet: d.wallet, registry: d.registry, ranAt: new Date().toISOString(), passed, total: results.length, results };
+  const report = { network: d.network, wallet: d.wallet, registry: d.registry, ranAt: new Date().toISOString(), mode: PUBLIC ? "public" : "owner", passed, total: results.length, results };
   fs.mkdirSync(STATE_DIR, { recursive: true });
-  fs.writeFileSync(path.join(STATE_DIR, "attack-report.json"), JSON.stringify(report, null, 2));
+  fs.writeFileSync(path.join(STATE_DIR, PUBLIC ? "attack-report-public.json" : "attack-report.json"), JSON.stringify(report, null, 2));
+  if (PUBLIC) {
+    info(color.gray(`report: ${path.join(STATE_DIR, "attack-report-public.json")}`));
+    if (passed !== results.length) process.exitCode = 1;
+    return;
+  }
   const md = [
     `# Attack report`,
     ``,

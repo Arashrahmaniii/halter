@@ -1,0 +1,31 @@
+{
+  "_note": "Testnet agent key, published on purpose: it is a function-call key that can only call execute/propose/report_scam on the wallet. Try to steal the funds with it.",
+  "network": "testnet",
+  "wallet": "leash-agent-of9197.testnet",
+  "registry": "registry.leash-owner-of9197.testnet",
+  "owner": "leash-owner-of9197.testnet",
+  "drainer": "drainer.leash-owner-of9197.testnet",
+  "contacts": [
+    "cloudhost.leash-owner-of9197.testnet"
+  ],
+  "default_target": "drainer.leash-owner-of9197.testnet",
+  "people": {
+    "cloudhost": "cloudhost.leash-owner-of9197.testnet",
+    "dataapi": "dataapi.leash-owner-of9197.testnet",
+    "cl0udhost": "cl0udhost.leash-owner-of9197.testnet",
+    "drainer": "drainer.leash-owner-of9197.testnet",
+    "support-refunds": "support-refunds.leash-owner-of9197.testnet"
+  },
+  "known_names": [
+    "wrap.testnet",
+    "usdc.fakes.testnet",
+    "usdt.fakes.testnet",
+    "v1.signer-prod.testnet",
+    "outlayer.testnet",
+    "intents.testnet"
+  ],
+  "agent_key": {
+    "public_key": "ed25519:HEdqqN9giTfdaQfsS84uNgmnKptJMVxTBEgTQ1H9odtK",
+    "private_key": "ed25519:3bMnn3a1CVkq8G43X69ao7aKQ3BrSUxbrsddig47nCyu1fdJV7jBDkpbD3uw24GiwP8GvK7hBi5KG9AiMPFEngZD"
+  }
+}

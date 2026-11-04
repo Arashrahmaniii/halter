@@ -4,34 +4,34 @@
 
 
 == 1. Accounts from the testnet faucet
-  owner (the human): leash-owner-p07hkf.testnet
-  agent wallet:      leash-agent-p07hkf.testnet
+  owner (the human): leash-owner-of9197.testnet
+  agent wallet:      leash-agent-of9197.testnet
 
 == 2. Registry, guardian and demo counterparties (sub-accounts of the owner)
-  registry:  registry.leash-owner-p07hkf.testnet
-  guardian:  guardian.leash-owner-p07hkf.testnet
-  cloudhost        cloudhost.leash-owner-p07hkf.testnet  contact: the company's hosting provider
-  dataapi          dataapi.leash-owner-p07hkf.testnet  new legitimate supplier
-  cl0udhost        cl0udhost.leash-owner-p07hkf.testnet  lookalike of cloudhost (address poisoning)
-  drainer          drainer.leash-owner-p07hkf.testnet  known scam account, blocked in the registry
-  support-refunds  support-refunds.leash-owner-p07hkf.testnet  fresh scam-bait account, unknown to the registry
+  registry:  registry.leash-owner-of9197.testnet
+  guardian:  guardian.leash-owner-of9197.testnet
+  cloudhost        cloudhost.leash-owner-of9197.testnet  contact: the company's hosting provider
+  dataapi          dataapi.leash-owner-of9197.testnet  new legitimate supplier
+  cl0udhost        cl0udhost.leash-owner-of9197.testnet  lookalike of cloudhost (address poisoning)
+  drainer          drainer.leash-owner-of9197.testnet  known scam account, blocked in the registry
+  support-refunds  support-refunds.leash-owner-of9197.testnet  fresh scam-bait account, unknown to the registry
 
 == 3. Deploy the registry and seed one confirmed scam account
-    deploy: https://testnet.nearblocks.io/txns/2cvEnwTP6quz6WangCbCNtqDBtMzyX5LYQcrLpt6Qmm1
-  registry.block(drainer.leash-owner-p07hkf.testnet)
-    tx: https://testnet.nearblocks.io/txns/8cgCnUELqJy1YbgX6xjVxRjgURJwUEf1CzYbQUnoC5di
+    deploy: https://testnet.nearblocks.io/txns/2vskTBfVXyWPFTVC12dN324WRq8TmGP7BzDcrZviZhR4
+  registry.block(drainer.leash-owner-of9197.testnet)
+    tx: https://testnet.nearblocks.io/txns/AtrmrkfXEcjxC83RibZwYzBfsN5Zar4YPh2AAXj1TELw
 
 == 4. Deploy the Leash wallet on the agent account
-    deploy: https://testnet.nearblocks.io/txns/7VtjYPcZsmPbLzE63WPSaCP19M9pkGuDbB45MkjtFrV4
+    deploy: https://testnet.nearblocks.io/txns/EbzP6R1q2mwhRCkRbuAc4w5eLycT6ag3mX17pEVMoHdV
   policy: 1 NEAR per tx, 2 NEAR per rolling 24h, owner approval above 0.5 NEAR and for first-time receivers
 
 == 5. Owner gives the agent a scoped function-call key
-  key ed25519:HqJVMyzNgW3h… may call only execute/propose/report_scam on leash-agent-p07hkf.testnet, gas budget 1 NEAR
-    tx: https://testnet.nearblocks.io/txns/Eh74brECkf8kHKj1dapLSHX2byjgbwrMuxW1oNJMmVFw
+  key ed25519:HEdqqN9giTfd… may call only execute/propose/report_scam on leash-agent-of9197.testnet, gas budget 1 NEAR
+    tx: https://testnet.nearblocks.io/txns/9EDE5Gyst327WcQbeXFJrAs3b9Gaof3XeHHAjhM7Eza4
 
 == 6. Lock the agent account: delete its full-access key
-    tx: https://testnet.nearblocks.io/txns/GaaZP8jdr8cPTnU827jKjvc66opxrtFQ9tT4rtvKVB4i
-  remaining key ed25519:HqJVMyzNgW3h…  function-call -> leash-agent-p07hkf.testnet [execute, propose, report_scam]
+    tx: https://testnet.nearblocks.io/txns/3CGC1wB9hZXoi2SN6Gyn1iczqtZ3pV6coa662z3MaJxj
+  remaining key ed25519:HEdqqN9giTfd…  function-call -> leash-agent-of9197.testnet [execute, propose, report_scam]
 
 == Done
   deployment saved to D:\hackathons\leash\agent\.leash\deployment.json

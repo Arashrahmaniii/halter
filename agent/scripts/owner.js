@@ -8,7 +8,8 @@
 //   npm run owner -- limits <max_per_tx> <daily_limit> <approval_above>   (NEAR)
 //   npm run owner -- contact <account>      add a trusted contact
 //   npm run owner -- deny <account>
-import { account, call, fmtNear, loadDeployment, near, teraToGas } from "../src/near.js";
+//   npm run owner -- rotate-key [allowance]  new agent key (old one revoked), e.g. when its gas allowance ran out
+import { account, call, fmtNear, loadDeployment, loadKey, near, newKeyPair, saveKey, teraToGas } from "../src/near.js";
 import { LeashWalletClient } from "../src/wallet.js";
 import { color, detail, info, link, tag } from "../src/log.js";
 
@@ -55,6 +56,17 @@ switch (cmd) {
   case "deny":
     show(await call(owner, d.wallet, "deny", { account_id: args[0] }, { gas: teraToGas("30") }));
     break;
+  case "rotate-key": {
+    const old = loadKey(d.wallet, "agent");
+    const kp = newKeyPair();
+    const added = await call(owner, d.wallet, "add_agent_key", { public_key: kp.getPublicKey().toString(), label: "invoice-bot", allowance: near(Number(args[0] || 1)).toString() }, { gas: teraToGas("30") });
+    link("added", added.url);
+    saveKey(d.wallet, kp, "agent");
+    const revoked = await call(owner, d.wallet, "revoke_agent_key", { public_key: old.public_key }, { gas: teraToGas("30") });
+    link("revoked", revoked.url);
+    info(`new agent key ${kp.getPublicKey().toString()}; run npm run publish-key to update the red-team page`);
+    break;
+  }
   default:
-    console.log(color.gray("commands: pending | approve <id> | reject <id> [reason] | freeze [reason] | unfreeze | limits <tx> <daily> <approval> | contact <acct> | deny <acct>"));
+    console.log(color.gray("commands: pending | approve <id> | reject <id> [reason] | freeze [reason] | unfreeze | limits <tx> <daily> <approval> | contact <acct> | deny <acct> | rotate-key [allowance]"));
 }

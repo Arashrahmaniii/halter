@@ -6,6 +6,11 @@ Leash is a spending firewall for AI agents on NEAR. The agent's account holds no
 
 Built for NEAR HACKATHON 2026, track **AI Security & Defense** (`security`), also relevant to **Agent Economy** (`agents`).
 
+> ### Steal this agent's money
+> We published the agent's private key. It is the only key on the account. Open the red-team page, use the key however you like, and try to move the wallet's NEAR anywhere the owner did not allow:
+> **<https://arashrahmaniii.github.io/leash/web/redteam.html>** (testnet; also runs locally from [`web/redteam.html`](web/redteam.html)).
+> Every button signs a real testnet transaction with the published key: direct transfers, calls to other contracts, rewriting the policy, adding a full-access key, deleting the account, forging the registry callback, paying the known drainer, prompt-injecting the agent with or without our guard.
+
 ---
 
 ## The problem
@@ -72,6 +77,8 @@ What you should see:
    - **INV-1004** (`cl0udhost…`, a lookalike of the contact `cloudhost…`): Scout `block` (homoglyph), and the agent reports it to the shared registry, which now shows it as `Flagged` for every Leash wallet.
 3. `npm run attacks` ends with `15/15 attacks stopped` and writes [`docs/attack-report.md`](docs/attack-report.md).
 
+**No setup at all:** `cd agent && npm ci && npm run attacks -- --public` runs 13 of the attacks against the shared testnet deployment using the published agent key in [`web/redteam.json`](web/redteam.json) (the two that need the owner's or guardian's key are skipped).
+
 Recorded output of these runs: [`docs/setup-output.txt`](docs/setup-output.txt), [`docs/demo-output.txt`](docs/demo-output.txt), [`docs/attacks-output.txt`](docs/attacks-output.txt).
 
 ### Look without running anything
@@ -80,11 +87,11 @@ The deployment used for the recorded runs is live on testnet:
 
 | | Account |
 |---|---|
-| Agent wallet (Leash Wallet contract) | [`leash-agent-p07hkf.testnet`](https://testnet.nearblocks.io/address/leash-agent-p07hkf.testnet) |
-| Owner (the human) | [`leash-owner-p07hkf.testnet`](https://testnet.nearblocks.io/address/leash-owner-p07hkf.testnet) |
-| Shared registry | [`registry.leash-owner-p07hkf.testnet`](https://testnet.nearblocks.io/address/registry.leash-owner-p07hkf.testnet) |
+| Agent wallet (Leash Wallet contract) | [`leash-agent-of9197.testnet`](https://testnet.nearblocks.io/address/leash-agent-of9197.testnet) |
+| Owner (the human) | [`leash-owner-of9197.testnet`](https://testnet.nearblocks.io/address/leash-owner-of9197.testnet) |
+| Shared registry | [`registry.leash-owner-of9197.testnet`](https://testnet.nearblocks.io/address/registry.leash-owner-of9197.testnet) |
 
-Dashboard (static page, reads testnet RPC directly): open [`web/index.html`](web/index.html) with `?wallet=leash-agent-p07hkf.testnet`, or the hosted copy at <https://arashrahmaniii.github.io/leash/web/?wallet=leash-agent-p07hkf.testnet>.
+Dashboard (static page, reads testnet RPC directly): <https://arashrahmaniii.github.io/leash/web/?wallet=leash-agent-of9197.testnet>, or open [`web/index.html`](web/index.html) locally with the same query string.
 
 ### Use a real model instead of the scripted agent
 
@@ -140,18 +147,36 @@ Limits of the key that Leash has to cover:
 
 Scout is also a service other agents can call: `npm run scout -- --serve 8787` → `GET /check?account=<id>` returns `{verdict, score, signals}`. One-off: `npm run scout -- <account>`.
 
+The scoring rules live in one dependency-free module, [`agent/src/scout-core.js`](agent/src/scout-core.js), used both by the Node agent and by the red-team page in the browser.
+
 Scout is advisory; the contract is the authority. If NearBlocks is rate-limited, Scout says so in its output and the contract still applies its own rules (for example, first payments to new receivers need the owner).
+
+## We audited our own contract
+
+Before submitting, we reviewed Leash the way we review bug-bounty targets. Findings, all fixed and covered by regression tests:
+
+| Finding | Impact | Fix | Test |
+|---|---|---|---|
+| A payment that needed the owner's approval was parked **without** the registry check, so a compromised agent could put "pay the drainer" in the owner's queue | owner could be misled into approving a payment to a confirmed scam | registry checked before parking and again at approval (new `Checking` status) | `payment_needing_approval_is_checked_against_the_registry_first`, `owner_approval_rechecks_the_registry` |
+| Unbounded `Call` arguments and FT memos were stored in history and the queue; NEAR charges storage to the wallet's own balance | storage griefing: a key holder could lock up the wallet's balance | 2 KB argument cap, memo and method-name caps, checked before anything is stored | `oversized_call_args_are_refused_before_storage`, `oversized_ft_memo_is_refused` |
+| `propose` bypassed the rate limit and the queue cap | queue flooding and storage growth | proposals count as actions and respect the cap | `proposals_count_against_rate_limit_and_queue_cap` |
+| Expired approvals never left the queue | a full queue of stale items blocks real approvals | expired items are pruned on every call | `expired_approvals_leave_the_queue` |
+| An agent report could denylist one of the owner's contacts; ownership moved in one step | self-inflicted DoS; typo loses the wallet | contacts are never auto-denylisted; `propose_owner` + `accept_owner` | `agent_reports_cannot_denylist_contacts`, `ownership_moves_in_two_steps` |
 
 ## Repository layout
 
 ```
-contracts/leash-wallet     policy wallet (Rust, near-sdk 5.30) + 38 unit tests
+contracts/leash-wallet     policy wallet (Rust, near-sdk 5.30) + 45 unit tests
 contracts/leash-registry   bonded, curated scam registry + 10 unit tests
 res/                       prebuilt wasm used by `npm run setup`
-agent/src                  near.js (RPC/keys), wallet.js (client), scout.js, guard.js, llm.js
-agent/scripts              setup, demo, attacks, status, owner (approve/reject/freeze/limits), scout (CLI + HTTP)
+agent/src                  near.js (RPC/keys), wallet.js (client), scout-core.js (scoring, shared with the browser),
+                           scout.js (Node data sources), guard.js, llm.js
+agent/scripts              setup, demo, attacks (--public), status, owner (approve/reject/freeze/limits/rotate-key),
+                           scout (CLI + HTTP), publish-key
 agent/test                 Scout unit tests (node:test)
 web/index.html             read-only dashboard (no build step, no dependencies)
+web/redteam.html           "steal this agent" page: signs real testnet transactions with the published key
+web/redteam.json           the published testnet agent key and account ids for that page
 docs/                      attack report, recorded runs, threat model
 ```
 
@@ -166,18 +191,19 @@ npm run owner -- unfreeze
 npm run owner -- limits 1 2 0.5          # NEAR: per tx, rolling 24h, approval above
 npm run owner -- contact <account>       # trusted contact
 npm run owner -- deny <account>
+npm run owner -- rotate-key 1            # new agent key with a 1 NEAR gas allowance, old key revoked
 ```
 
 ## Tests
 
 ```bash
 cd agent && npm test                      # 13 Scout tests
-cargo test                                # 48 contract tests (Linux/macOS; on Windows run it in WSL —
+cargo test                                # 55 contract tests (Linux/macOS; on Windows run it in WSL —
                                           # near-sdk's unit-test dependencies need a C toolchain)
 npm run build:contracts                   # rebuild res/*.wasm from source (Rust 1.95+, wasm32-unknown-unknown)
 ```
 
-The contract tests cover each policy rule, the rolling window (no midnight reset), concurrent reservations, every registry answer (including registry failure → fail closed), owner approval re-checking the registry, freeze during an in-flight check, expiry, and history bounds. The on-chain checks that unit tests cannot reach (`#[private]`, access-key scope) are covered by the attack suite on testnet.
+The contract tests cover each policy rule, the self-audit regressions above, the rolling window (no midnight reset), concurrent reservations, every registry answer (including registry failure → fail closed), owner approval re-checking the registry, freeze during an in-flight check, expiry, and history bounds. The on-chain checks that unit tests cannot reach (`#[private]`, access-key scope) are covered by the attack suite on testnet.
 
 ## Limits and what is out of scope
 

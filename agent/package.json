@@ -9,7 +9,8 @@
     "attacks": "node scripts/attacks.js",
     "status": "node scripts/status.js",
     "owner": "node scripts/owner.js",
-    "scout": "node scripts/scout.js"
+    "scout": "node scripts/scout.js",
+    "publish-key": "node scripts/publish-key.js"
   },
   "license": "MIT",
   "type": "module",
