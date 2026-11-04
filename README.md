@@ -14,6 +14,10 @@ Built for NEAR HACKATHON 2026, track **AI Security & Defense** (`security`), als
 > We published the agent's private key. It is the only key on the account. Open the red-team page, use the key however you like, and try to move the wallet's NEAR anywhere the owner did not allow:
 > **<https://arashrahmaniii.github.io/halter/web/redteam.html>** (testnet; also runs locally from [`web/redteam.html`](web/redteam.html)).
 > Every button signs a real testnet transaction with the published key: direct transfers, calls to other contracts, rewriting the policy, adding a full-access key, deleting the account, forging the registry callback, paying the known drainer, prompt-injecting the agent with or without our guard.
+>
+> **Demo video (57 s):** <https://arashrahmaniii.github.io/halter/docs/halter-demo.mp4> (recorded from the live page; every attack in it is a real testnet transaction).
+
+[![The red-team page: the agent's real key and what NEAR lets it do](docs/screenshot-redteam.png)](https://arashrahmaniii.github.io/halter/web/redteam.html)
 
 ---
 
