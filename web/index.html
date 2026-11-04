@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leash Dashboard</title>
+<meta name="description" content="Live, read-only view of a Leash agent wallet on NEAR: keys, limits, approval queue, decisions and the shared scam registry.">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #5f6673; --line: #e3e6eb;
+    --accent: #2f5bea; --ok: #1d8a4e; --warn: #b26a00; --bad: #c62f2f; --chip: #eef1f6;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b2; --line: #2a2f3a;
+      --accent: #7c9cff; --ok: #4cc38a; --warn: #f0b04a; --bad: #ff6b6b; --chip: #222733;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); }
+  main { max-width: 1100px; margin: 0 auto; padding: 8px 16px 40px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .wide { grid-column: 1 / -1; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  input { flex: 1 1 260px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: 14px var(--mono); }
+  button { padding: 8px 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .mono { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--chip); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .bar { height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; margin: 6px 0 2px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  ul.list { list-style: none; padding: 0; margin: 0; }
+  ul.list li { padding: 8px 0; border-top: 1px solid var(--line); }
+  ul.list li:first-child { border-top: 0; }
+  .reasons { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .empty { color: var(--muted); }
+  a { color: var(--accent); }
+  footer { max-width: 1100px; margin: 0 auto; padding: 0 16px 30px; color: var(--muted); font-size: 13px; }
+  .err { color: var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Leash — agent wallet dashboard</h1>
+  <p>Read-only view of an AI agent's NEAR wallet: what its key can do, how much it may spend, what waits for a human, and every decision the contract made.</p>
+</header>
+<main>
+  <section class="panel wide">
+    <form id="f">
+      <input id="wallet" placeholder="agent wallet, e.g. leash-agent-xxxx.testnet" aria-label="Wallet account">
+      <input id="registry" placeholder="registry (optional, read from the wallet's policy)" aria-label="Registry account">
+      <button>Load</button>
+      <span id="state" class="reasons"></span>
+    </form>
+  </section>
+  <section class="panel"><h2>Wallet</h2><dl class="kv" id="wallet-kv"><dt>status</dt><dd class="empty">enter a wallet above</dd></dl></section>
+  <section class="panel"><h2>Keys on the account</h2><ul class="list" id="keys"></ul></section>
+  <section class="panel"><h2>Limits (rolling 24 h)</h2><div id="limits"></div></section>
+  <section class="panel"><h2>Waiting for the owner</h2><ul class="list" id="pending"></ul></section>
+  <section class="panel wide"><h2>Decisions (newest first)</h2><ul class="list" id="decisions"></ul></section>
+  <section class="panel wide"><h2>Shared scam registry</h2><ul class="list" id="registry-list"></ul></section>
+</main>
+<footer>Data comes straight from NEAR testnet RPC. Source: <a href="https://github.com/Arashrahmaniii/leash">github.com/Arashrahmaniii/leash</a></footer>
+<script>
+const RPCS = ["https://test.rpc.fastnear.com", "https://near-testnet.drpc.org", "https://rpc.testnet.near.org"];
+const EXPLORER = "https://testnet.nearblocks.io";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const acct = (id) => `<a class="mono" href="${EXPLORER}/address/${encodeURIComponent(id)}" target="_blank" rel="noopener">${esc(id)}</a>`;
+
+async function rpc(method, params) {
+  let last;
+  for (const url of RPCS) {
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error.data || j.error.message || JSON.stringify(j.error));
+      return j.result;
+    } catch (e) { last = e; }
+  }
+  throw last;
+}
+async function view(contract, method, args = {}) {
+  const r = await rpc("query", { request_type: "call_function", finality: "final", account_id: contract, method_name: method, args_base64: btoa(JSON.stringify(args)) });
+  return JSON.parse(new TextDecoder().decode(new Uint8Array(r.result)));
+}
+function near(yocto) {
+  const n = Number(BigInt(yocto || 0) / 10n ** 20n) / 1e4;
+  return `${n.toLocaleString(undefined, { maximumFractionDigits: 4 })} NEAR`;
+}
+const amountOf = (a) => a.type === "Call" ? near(a.deposit) : a.type === "FtTransfer" ? `${esc(a.amount)} ${esc(a.token_id)}` : near(a.amount);
+const target = (a) => a.receiver_id || a.contract_id;
+const cls = { Settled: "ok", Dispatched: "ok", Checking: "warn", Pending: "warn", Blocked: "bad", Failed: "bad", Rejected: "bad", Expired: "bad", Flagged: "warn", Cleared: "ok", Unknown: "" };
+const chip = (s) => `<span class="chip ${cls[s] || ""}">${esc(s)}</span>`;
+
+async function load(wallet, registryOverride) {
+  $("state").textContent = "loading…";
+  try {
+    const [status, policy, pending, decisions, keys] = await Promise.all([
+      view(wallet, "get_status"), view(wallet, "get_policy"), view(wallet, "get_pending"),
+      view(wallet, "get_decisions", { limit: 30 }),
+      rpc("query", { request_type: "view_access_key_list", finality: "final", account_id: wallet }),
+    ]);
+    const registry = registryOverride || policy.registry_id;
+    $("wallet-kv").innerHTML = `
+      <dt>account</dt><dd>${acct(wallet)}</dd>
+      <dt>owner</dt><dd>${acct(status.owner_id)}</dd>
+      <dt>guardians</dt><dd>${status.guardians.map(acct).join(", ") || "—"}</dd>
+      <dt>kill switch</dt><dd>${status.frozen ? '<span class="chip bad">FROZEN</span>' : '<span class="chip ok">live</span>'}</dd>
+      <dt>balance</dt><dd>${near(status.balance)}</dd>
+      <dt>receivers</dt><dd>${esc(policy.receiver_mode)}${policy.approve_new_receivers ? " · first payment to a new receiver needs the owner" : ""}</dd>
+      <dt>rate</dt><dd>${status.actions_last_hour} / ${status.max_actions_per_hour} actions in the last hour</dd>
+      <dt>registry</dt><dd>${registry ? acct(registry) : "—"} ${policy.block_flagged ? "(flagged ⇒ block)" : "(flagged ⇒ ask owner)"}</dd>`;
+    const fullAccess = keys.keys.filter((k) => k.access_key.permission === "FullAccess");
+    $("keys").innerHTML = (fullAccess.length ? "" : `<li class="ok"><b>No full-access key.</b> Only the contract's own rules can move funds.</li>`) +
+      keys.keys.map((k) => {
+        const p = k.access_key.permission;
+        if (p === "FullAccess") return `<li class="bad"><b>FULL ACCESS</b> <span class="mono">${esc(k.public_key)}</span></li>`;
+        const fc = p.FunctionCall;
+        return `<li><span class="mono">${esc(k.public_key.slice(0, 24))}…</span><div class="reasons">function-call → ${esc(fc.receiver_id)} [${fc.method_names.map(esc).join(", ")}] · gas allowance ${fc.allowance ? near(fc.allowance) : "unlimited"}</div></li>`;
+      }).join("");
+    $("limits").innerHTML = status.assets.map((a) => {
+      const spent = BigInt(a.spent_24h), lim = BigInt(a.limits.daily_limit || "1");
+      const pct = lim ? Number((spent * 1000n) / lim) / 10 : 0;
+      const fmt = a.asset === "near" ? near : (x) => `${x} ${a.asset}`;
+      return `<div><b>${esc(a.asset)}</b> — ${fmt(a.spent_24h)} of ${fmt(a.limits.daily_limit)}
+        <div class="bar"><span style="width:${Math.min(100, pct)}%"></span></div>
+        <div class="reasons">per transaction ≤ ${fmt(a.limits.max_per_tx)} · owner approval above ${fmt(a.limits.approval_above)}</div></div>`;
+    }).join("") || '<p class="empty">no assets allowed</p>';
+    $("pending").innerHTML = pending.length ? pending.map((p) =>
+      `<li>${chip("Pending")} #${esc(p.id)} ${esc(p.action.type)} ${amountOf(p.action)} → ${acct(target(p.action))}<div class="reasons">${p.reasons.map(esc).join(" · ")}</div><div class="reasons">approve: <span class="mono">npm run owner -- approve ${esc(p.id)}</span></div></li>`).join("")
+      : '<li class="empty">nothing waiting</li>';
+    $("decisions").innerHTML = decisions.length ? decisions.map((d) =>
+      `<li>${chip(d.status)} <b>#${esc(d.id)}</b> ${esc(d.action.type)} ${amountOf(d.action)} → ${acct(target(d.action))}
+        <span class="reasons">· ${esc(d.requested_by)}${d.memo ? " · " + esc(d.memo) : ""} · ${new Date(Number(d.updated_at_ms)).toLocaleString()}</span>
+        ${d.reasons?.length ? `<div class="reasons">${d.reasons.map(esc).join(" · ")}</div>` : ""}</li>`).join("")
+      : '<li class="empty">no decisions yet</li>';
+    if (registry) {
+      const entries = await view(registry, "list_entries", { limit: 100 });
+      $("registry-list").innerHTML = entries.length ? entries.map(([id, e]) =>
+        `<li>${chip(e.status)} ${acct(id)} <span class="reasons">· ${e.total_reports} report(s)${e.review_reason ? " · " + esc(e.review_reason) : ""}</span></li>`).join("")
+        : '<li class="empty">registry is empty</li>';
+    }
+    $("state").textContent = `updated ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    $("state").innerHTML = `<span class="err">${esc(e.message || e)}</span>`;
+  }
+}
+
+const q = new URLSearchParams(location.search);
+let timer;
+function start(wallet, registry) {
+  if (!wallet) return;
+  $("wallet").value = wallet; $("registry").value = registry || "";
+  clearInterval(timer);
+  load(wallet, registry);
+  timer = setInterval(() => load(wallet, registry), 10000);
+}
+$("f").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const w = $("wallet").value.trim(), r = $("registry").value.trim();
+  history.replaceState(null, "", `?wallet=${encodeURIComponent(w)}${r ? "&registry=" + encodeURIComponent(r) : ""}`);
+  start(w, r);
+});
+start(q.get("wallet"), q.get("registry"));
+</script>
+</body>
+</html>

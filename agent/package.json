@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
-    "build:contracts": "cd .. && cargo build --target wasm32-unknown-unknown --release",
+    "build:contracts": "cd .. && cargo build --target wasm32-unknown-unknown --release && node -e \"for (const f of ['leash_wallet','leash_registry']) require('fs').copyFileSync('target/wasm32-unknown-unknown/release/'+f+'.wasm','res/'+f+'.wasm')\"",
     "setup": "node scripts/setup.js",
     "demo": "node scripts/demo.js",
     "attacks": "node scripts/attacks.js",

@@ -191,7 +191,7 @@ async function main() {
     ``,
     `| # | Attack | Stopped by | Evidence | Tx |`,
     `|---|---|---|---|---|`,
-    ...results.map((r) => `| ${r.id} | ${r.title} | ${r.stoppedBy || "not stopped"} | ${String(r.evidence).replace(/\|/g, "\\|").slice(0, 220)} | ${r.tx ? `[link](${r.tx})` : "rejected before inclusion"} |`),
+    ...results.map((r) => `| ${r.id} | ${r.title} | ${r.stoppedBy || "not stopped"} | ${String(r.evidence).replace(/\|/g, "\\|").slice(0, 220)} | ${r.tx ? `[link](${r.tx})` : String(r.stoppedBy).includes("protocol") ? "rejected before inclusion" : "failed on-chain (no state change)"} |`),
     ``,
   ].join("\n");
   fs.mkdirSync(path.join(ROOT, "..", "docs"), { recursive: true });

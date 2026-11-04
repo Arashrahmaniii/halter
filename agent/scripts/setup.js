@@ -27,7 +27,9 @@ import {
 } from "../src/near.js";
 import { color, info, link, step } from "../src/log.js";
 
-const WASM_DIR = path.resolve(ROOT, "..", "target", "wasm32-unknown-unknown", "release");
+// Prebuilt contracts are committed in res/ so judges do not need Rust; `npm run build:contracts`
+// rebuilds them from source and refreshes res/.
+const WASM_DIR = path.resolve(ROOT, "..", "res");
 const WALLET_WASM = path.join(WASM_DIR, "leash_wallet.wasm");
 const REGISTRY_WASM = path.join(WASM_DIR, "leash_registry.wasm");
 

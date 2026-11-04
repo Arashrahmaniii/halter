@@ -1,0 +1,38 @@
+
+> leash-agent@1.0.0 setup
+> node scripts/setup.js --force
+
+
+== 1. Accounts from the testnet faucet
+  owner (the human): leash-owner-p07hkf.testnet
+  agent wallet:      leash-agent-p07hkf.testnet
+
+== 2. Registry, guardian and demo counterparties (sub-accounts of the owner)
+  registry:  registry.leash-owner-p07hkf.testnet
+  guardian:  guardian.leash-owner-p07hkf.testnet
+  cloudhost        cloudhost.leash-owner-p07hkf.testnet  contact: the company's hosting provider
+  dataapi          dataapi.leash-owner-p07hkf.testnet  new legitimate supplier
+  cl0udhost        cl0udhost.leash-owner-p07hkf.testnet  lookalike of cloudhost (address poisoning)
+  drainer          drainer.leash-owner-p07hkf.testnet  known scam account, blocked in the registry
+  support-refunds  support-refunds.leash-owner-p07hkf.testnet  fresh scam-bait account, unknown to the registry
+
+== 3. Deploy the registry and seed one confirmed scam account
+    deploy: https://testnet.nearblocks.io/txns/2cvEnwTP6quz6WangCbCNtqDBtMzyX5LYQcrLpt6Qmm1
+  registry.block(drainer.leash-owner-p07hkf.testnet)
+    tx: https://testnet.nearblocks.io/txns/8cgCnUELqJy1YbgX6xjVxRjgURJwUEf1CzYbQUnoC5di
+
+== 4. Deploy the Leash wallet on the agent account
+    deploy: https://testnet.nearblocks.io/txns/7VtjYPcZsmPbLzE63WPSaCP19M9pkGuDbB45MkjtFrV4
+  policy: 1 NEAR per tx, 2 NEAR per rolling 24h, owner approval above 0.5 NEAR and for first-time receivers
+
+== 5. Owner gives the agent a scoped function-call key
+  key ed25519:HqJVMyzNgW3h… may call only execute/propose/report_scam on leash-agent-p07hkf.testnet, gas budget 1 NEAR
+    tx: https://testnet.nearblocks.io/txns/Eh74brECkf8kHKj1dapLSHX2byjgbwrMuxW1oNJMmVFw
+
+== 6. Lock the agent account: delete its full-access key
+    tx: https://testnet.nearblocks.io/txns/GaaZP8jdr8cPTnU827jKjvc66opxrtFQ9tT4rtvKVB4i
+  remaining key ed25519:HqJVMyzNgW3h…  function-call -> leash-agent-p07hkf.testnet [execute, propose, report_scam]
+
+== Done
+  deployment saved to D:\hackathons\leash\agent\.leash\deployment.json
+  next: npm run demo  then  npm run attacks
