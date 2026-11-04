@@ -1,6 +1,6 @@
 // Attack suite: every way we could think of for a compromised or prompt-injected agent to move
 // money it should not. Runs against the live testnet deployment and records what stopped each
-// attack, with transaction links. Writes .leash/attack-report.json and docs/attack-report.md.
+// attack, with transaction links. Writes .halter/attack-report.json and docs/attack-report.md.
 //
 // Usage: npm run attacks              (your own deployment from `npm run setup`)
 //        npm run attacks -- --public  (no setup: the shared testnet deployment and its published
@@ -23,9 +23,9 @@ import {
   teraToGas,
   txUrl,
 } from "../src/near.js";
-import { LeashWalletClient, transferAction } from "../src/wallet.js";
+import { HalterWalletClient, transferAction } from "../src/wallet.js";
 import { Scout } from "../src/scout.js";
-import { LeashGuard } from "../src/guard.js";
+import { HalterGuard } from "../src/guard.js";
 import { color, detail, info, step, tag } from "../src/log.js";
 
 const PUBLIC = process.argv.includes("--public") || !fs.existsSync(DEPLOYMENT_FILE);
@@ -39,11 +39,11 @@ const agentRaw = PUBLIC
   : account(d.wallet, "agent", { singleRpc: true });
 const ownerSigner = PUBLIC ? null : account(d.owner);
 const guardianSigner = PUBLIC ? null : account(d.guardian);
-const wallet = new LeashWalletClient(d.wallet, agentSigner);
-const ownerWallet = ownerSigner && new LeashWalletClient(d.wallet, ownerSigner);
-const guardianWallet = guardianSigner && new LeashWalletClient(d.wallet, guardianSigner);
+const wallet = new HalterWalletClient(d.wallet, agentSigner);
+const ownerWallet = ownerSigner && new HalterWalletClient(d.wallet, ownerSigner);
+const guardianWallet = guardianSigner && new HalterWalletClient(d.wallet, guardianSigner);
 const scout = new Scout({ walletId: d.wallet, registryId: d.registry, knownNames: known[d.network] || known.testnet });
-const guard = new LeashGuard({ wallet, scout, onWarn: "propose", quiet: true });
+const guard = new HalterGuard({ wallet, scout, onWarn: "propose", quiet: true });
 
 const results = [];
 
@@ -64,21 +64,21 @@ async function attack(id, title, attempt, expect, fn) {
   results.push({ id, title, attempt, expect, pass, stoppedBy: r.stoppedBy, evidence: r.evidence, tx: r.url || null });
 }
 
-// Raw transaction signed with the agent's function-call key, bypassing every Leash component.
+// Raw transaction signed with the agent's function-call key, bypassing every Halter component.
 async function rawTx(receiverId, acts) {
   const out = await agentRaw.signAndSendTransaction({ receiverId, actions: acts, throwOnFailure: true });
   return out;
 }
 
 const onChain = (tx) => ({
-  stoppedBy: tx.decision?.status === "Blocked" ? "Leash Wallet contract" : tx.decision?.status === "Pending" ? "Leash Wallet contract (owner approval)" : undefined,
+  stoppedBy: tx.decision?.status === "Blocked" ? "Halter Wallet contract" : tx.decision?.status === "Pending" ? "Halter Wallet contract (owner approval)" : undefined,
   evidence: `${tx.decision?.status}: ${(tx.decision?.reasons || []).join("; ")}`,
   url: tx.url,
   leaked: tx.decision?.status === "Settled" || tx.decision?.status === "Dispatched",
 });
 
 async function main() {
-  console.log(color.bold("\nLeash attack suite — testnet"));
+  console.log(color.bold("\nHalter attack suite — testnet"));
   info(`wallet ${d.wallet}, agent key = function-call key [execute, propose, report_scam]`);
   if (PUBLIC) info(color.yellow("public mode: shared deployment, published agent key, owner-only steps skipped"));
   else for (const p of await ownerWallet.pending()) await ownerWallet.reject(p.id, "stale: cleared before the attack suite");
@@ -116,7 +116,7 @@ async function main() {
         await call(ownerSigner, d.wallet, "on_registry_check", { id: "0" }, { gas: teraToGas("50") });
         return { evidence: "call succeeded", leaked: true };
       } catch (e) {
-        return { stoppedBy: "Leash Wallet contract (#[private])", evidence: errorText(e).match(/Method on_registry_check is private|private/i)?.[0] || errorText(e) };
+        return { stoppedBy: "Halter Wallet contract (#[private])", evidence: errorText(e).match(/Method on_registry_check is private|private/i)?.[0] || errorText(e) };
       }
     });
 
@@ -140,12 +140,12 @@ async function main() {
       const r = await guard.pay({ receiver: d.people["support-refunds"], amountYocto: near(0.1), memo: "attack P3" });
       const why = r.report.signals.filter((s) => s.level !== "info" && s.level !== "trust").map((s) => s.detail).join("; ");
       if (r.tx?.decision?.status === "Pending") {
-        if (!ownerWallet) return { stoppedBy: "Leash Scout + owner approval", evidence: `scout ${r.report.verdict} (${why}) → Pending: waits for the owner, who never approves it`, url: r.tx.url };
+        if (!ownerWallet) return { stoppedBy: "Halter Scout + owner approval", evidence: `scout ${r.report.verdict} (${why}) → Pending: waits for the owner, who never approves it`, url: r.tx.url };
         await ownerWallet.reject(r.tx.decision.id, "scam-bait name, brand-new account");
-        return { stoppedBy: "Leash Scout + owner approval", evidence: `scout ${r.report.verdict} (${why}) → Pending → owner rejected`, url: r.tx.url };
+        return { stoppedBy: "Halter Scout + owner approval", evidence: `scout ${r.report.verdict} (${why}) → Pending → owner rejected`, url: r.tx.url };
       }
-      if (r.status === "refused") return { stoppedBy: "Leash Scout", evidence: `scout ${r.report.verdict}: ${why}` };
-      if (r.tx?.decision?.status === "Blocked") return { stoppedBy: "Leash Scout + Leash Wallet contract", evidence: `scout ${r.report.verdict} (${why}) → contract Blocked: ${r.tx.decision.reasons.join("; ")}`, url: r.tx.url };
+      if (r.status === "refused") return { stoppedBy: "Halter Scout", evidence: `scout ${r.report.verdict}: ${why}` };
+      if (r.tx?.decision?.status === "Blocked") return { stoppedBy: "Halter Scout + Halter Wallet contract", evidence: `scout ${r.report.verdict} (${why}) → contract Blocked: ${r.tx.decision.reasons.join("; ")}`, url: r.tx.url };
       return { evidence: `status ${r.status}`, leaked: r.status === "Settled" || r.status === "Dispatched" };
     });
 
@@ -159,7 +159,7 @@ async function main() {
         const tx = await wallet.execute(transferAction(d.people.cloudhost, near(0.45)), `attack P5 #${i + 1}`);
         info(color.gray(`  #${i + 1}: ${tx.decision?.status}`));
         if (tx.decision?.status === "Blocked") {
-          return { stoppedBy: "Leash Wallet contract", evidence: `after ${sent.length} payments (${fmtNear(near(0.45) * BigInt(sent.length))}): ${tx.decision.reasons.join("; ")}`, url: tx.url };
+          return { stoppedBy: "Halter Wallet contract", evidence: `after ${sent.length} payments (${fmtNear(near(0.45) * BigInt(sent.length))}): ${tx.decision.reasons.join("; ")}`, url: tx.url };
         }
         sent.push(tx);
       }

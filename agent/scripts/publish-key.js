@@ -1,6 +1,6 @@
 // Publish the agent's function-call key for the red-team page (web/redteam.json).
 //
-// This is deliberate: Leash's claim is that the agent key cannot move money outside the owner's
+// This is deliberate: Halter's claim is that the agent key cannot move money outside the owner's
 // policy, so the key is safe to show. Testnet only. The owner key is never published.
 //
 // Usage: npm run publish-key

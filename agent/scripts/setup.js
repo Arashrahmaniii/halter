@@ -4,7 +4,7 @@
 // function-call key that can call execute / propose / report_scam on itself.
 //
 // Usage: npm run setup            (creates fresh accounts from the testnet faucet)
-//        npm run setup -- --force (replace an existing .leash/deployment.json)
+//        npm run setup -- --force (replace an existing .halter/deployment.json)
 import fs from "node:fs";
 import path from "node:path";
 import { Account, actions } from "near-api-js";
@@ -30,8 +30,8 @@ import { color, info, link, step } from "../src/log.js";
 // Prebuilt contracts are committed in res/ so judges do not need Rust; `npm run build:contracts`
 // rebuilds them from source and refreshes res/.
 const WASM_DIR = path.resolve(ROOT, "..", "res");
-const WALLET_WASM = path.join(WASM_DIR, "leash_wallet.wasm");
-const REGISTRY_WASM = path.join(WASM_DIR, "leash_registry.wasm");
+const WALLET_WASM = path.join(WASM_DIR, "halter_wallet.wasm");
+const REGISTRY_WASM = path.join(WASM_DIR, "halter_registry.wasm");
 
 const force = process.argv.includes("--force");
 if (fs.existsSync(DEPLOYMENT_FILE) && !force) {
@@ -46,8 +46,8 @@ for (const f of [WALLET_WASM, REGISTRY_WASM]) {
 }
 
 const rand = Math.random().toString(36).slice(2, 8);
-const OWNER = process.env.LEASH_OWNER || `leash-owner-${rand}.testnet`;
-const AGENT = process.env.LEASH_AGENT || `leash-agent-${rand}.testnet`;
+const OWNER = process.env.HALTER_OWNER || `halter-owner-${rand}.testnet`;
+const AGENT = process.env.HALTER_AGENT || `halter-agent-${rand}.testnet`;
 const sub = (name) => `${name}.${OWNER}`;
 
 async function faucetAccount(accountId) {
@@ -123,7 +123,7 @@ async function main() {
   info(`registry.block(${people.drainer})`);
   link("tx", blocked.url);
 
-  step("4. Deploy the Leash wallet on the agent account");
+  step("4. Deploy the Halter wallet on the agent account");
   const policy = {
     limits: {
       near: { max_per_tx: yocto(1), daily_limit: yocto(2), approval_above: yocto(0.5) },
@@ -175,7 +175,7 @@ async function main() {
     info(`remaining key ${k.public_key.slice(0, 20)}…  ${desc}`);
   }
   if (keys.some((k) => k.access_key.permission === "FullAccess")) throw new Error("Agent account still has a full-access key");
-  fs.rmSync(path.join(ROOT, ".leash", "keys", `${AGENT}.full-access.json`), { force: true });
+  fs.rmSync(path.join(ROOT, ".halter", "keys", `${AGENT}.full-access.json`), { force: true });
 
   saveDeployment({
     network: NETWORK.networkId,

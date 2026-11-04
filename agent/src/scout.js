@@ -1,4 +1,4 @@
-// Leash Scout for Node: wires the pure scoring core to NEAR RPC and the NearBlocks API.
+// Halter Scout for Node: wires the pure scoring core to NEAR RPC and the NearBlocks API.
 // The scoring rules live in scout-core.js (shared with the browser red-team page).
 import { NETWORK, view, viewAccount } from "./near.js";
 import { explain, gatherFacts, levenshtein, lookalike, makeNearblocks, score, skeleton, SCAM_WORDS } from "./scout-core.js";

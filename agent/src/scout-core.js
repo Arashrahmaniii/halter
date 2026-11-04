@@ -1,10 +1,10 @@
-// Leash Scout: counterparty check for agents that pay.
+// Halter Scout: counterparty check for agents that pay.
 //
 // Before an agent sends funds or calls a contract it asks Scout about the receiver. Scout
 // gathers facts from public sources, scores them, and answers allow / warn / block with reasons.
 //
 // Signals and where they come from:
-//   registry      Leash Registry contract (shared, evidence-backed blocklist)   -> RPC view `check`
+//   registry      Halter Registry contract (shared, evidence-backed blocklist)   -> RPC view `check`
 //   existence     NEAR RPC `view_account`                                          -> RPC
 //   lookalike     receiver vs the wallet's contacts and a list of known names     -> local
 //   age           account creation time                                           -> NearBlocks API
@@ -215,9 +215,9 @@ export function score(facts, { knownNames = [], now = Date.now(), warnAt = 50 } 
 
   // Shared registry.
   const reg = facts.registry;
-  if (reg?.status === "Blocked") add("registry", "block", 100, reg.total_reports ? `confirmed scam account in the shared registry (${reg.total_reports} report(s))` : "confirmed scam account in the shared registry (blocked by a curator)", "Leash Registry");
-  else if (reg?.status === "Flagged") add("registry", "warn", 60, `${reg.open_reports} open scam report(s) in the shared registry`, "Leash Registry");
-  else if (facts.errors?.registry) add("registry", "warn", 30, "registry unreachable", "Leash Registry");
+  if (reg?.status === "Blocked") add("registry", "block", 100, reg.total_reports ? `confirmed scam account in the shared registry (${reg.total_reports} report(s))` : "confirmed scam account in the shared registry (blocked by a curator)", "Halter Registry");
+  else if (reg?.status === "Flagged") add("registry", "warn", 60, `${reg.open_reports} open scam report(s) in the shared registry`, "Halter Registry");
+  else if (facts.errors?.registry) add("registry", "warn", 30, "registry unreachable", "Halter Registry");
 
   // Existence.
   if (facts.exists === false) {
@@ -233,8 +233,8 @@ export function score(facts, { knownNames = [], now = Date.now(), warnAt = 50 } 
   }
 
   // Trust from the user's own history.
-  if (contacts.includes(r)) add("contact", "trust", -40, "receiver is in the wallet's contact list", "Leash Wallet");
-  if (facts.paidBefore) add("history", "trust", -30, "this wallet has paid the receiver before", "Leash Wallet");
+  if (contacts.includes(r)) add("contact", "trust", -40, "receiver is in the wallet's contact list", "Halter Wallet");
+  if (facts.paidBefore) add("history", "trust", -30, "this wallet has paid the receiver before", "Halter Wallet");
 
   // Age and activity (soft signals; ignored for receivers the user already trusts).
   if (facts.exists && !trustedByUser) {

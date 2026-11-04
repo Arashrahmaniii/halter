@@ -1,4 +1,4 @@
-// Leash Scout as a CLI or a small HTTP service other agents can call.
+// Halter Scout as a CLI or a small HTTP service other agents can call.
 // Usage:
 //   npm run scout -- <account_id>                one-off check (uses the local deployment if any)
 //   npm run scout -- --serve [port]              GET /check?account=<id>[&wallet=<id>&registry=<id>]
@@ -40,7 +40,7 @@ if (args[0] === "--serve") {
         res.writeHead(502, { "content-type": "application/json" }).end(JSON.stringify({ error: String(e.message || e) }));
       }
     })
-    .listen(port, () => console.log(`Leash Scout listening on http://localhost:${port}/check?account=<id>`));
+    .listen(port, () => console.log(`Halter Scout listening on http://localhost:${port}/check?account=<id>`));
 } else if (args[0]) {
   const scout = new Scout({ walletId: dep.wallet, registryId: dep.registry, knownNames });
   const r = await scout.check(args[0]);

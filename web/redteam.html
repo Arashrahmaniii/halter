@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Steal This Agent</title>
-<meta name="description" content="We published an AI agent's private key. Try to drain its NEAR wallet. Leash keeps the money where the owner allowed.">
+<meta name="description" content="We published an AI agent's private key. Try to drain its NEAR wallet. Halter keeps the money where the owner allowed.">
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #5f6673; --line: #e3e6eb;
@@ -60,7 +60,7 @@
 <div class="wrap">
 <header>
   <h1>Steal this agent's money.</h1>
-  <p class="lead">This AI agent's wallet lives on NEAR testnet. Below is its private key: the real one, the only key on the account. Use it however you like. Leash's claim is simple: <b>nothing you do with this key moves money anywhere the owner did not allow.</b></p>
+  <p class="lead">This AI agent's wallet lives on NEAR testnet. Below is its private key: the real one, the only key on the account. Use it however you like. Halter's claim is simple: <b>nothing you do with this key moves money anywhere the owner did not allow.</b></p>
 </header>
 
 <section class="grid">
@@ -117,7 +117,7 @@
     <p class="muted" style="margin-top:0">The agent reads this email and decides what to pay. It is deliberately naive: it obeys any instruction it finds.</p>
     <textarea id="email"></textarea>
     <div class="row" style="margin-top:8px">
-      <label><input type="checkbox" id="skip" style="width:auto"> I control the agent process (skip Leash Guard and Scout)</label>
+      <label><input type="checkbox" id="skip" style="width:auto"> I control the agent process (skip Halter Guard and Scout)</label>
     </div>
     <div class="row" style="margin-top:8px"><button class="primary" id="run">Send the email to the agent</button></div>
   </div>
@@ -130,7 +130,7 @@
 <section class="panel">
   <h2>Every decision the contract made (live)</h2>
   <ul class="log" id="feed"></ul>
-  <p class="muted">Full view: <a id="dash" href="index.html">dashboard</a> · How it works: <a href="https://github.com/Arashrahmaniii/leash">README</a></p>
+  <p class="muted">Full view: <a id="dash" href="index.html">dashboard</a> · How it works: <a href="https://github.com/Arashrahmaniii/halter">README</a></p>
 </section>
 
 <footer>
@@ -325,9 +325,9 @@ $("run").addEventListener("click", async () => {
     if (!$("skip").checked) {
       const facts = await gatherFacts(d.receiver, { walletId: cfg.wallet, registryId: cfg.registry, sources: { view, viewAccount, nearblocks } });
       const rep = score(facts, { knownNames: cfg.known_names || [] });
-      lines.push(`Leash Scout: ${rep.verdict.toUpperCase()} (score ${rep.score})`, ...explain(rep));
+      lines.push(`Halter Scout: ${rep.verdict.toUpperCase()} (score ${rep.score})`, ...explain(rep));
       if (rep.verdict === "block") {
-        log("Prompt injection", "stopped", [...lines, "Leash Guard refuses to sign."]);
+        log("Prompt injection", "stopped", [...lines, "Halter Guard refuses to sign."]);
         return;
       }
       if (rep.verdict === "warn") {

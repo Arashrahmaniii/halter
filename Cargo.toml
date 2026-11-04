@@ -1,12 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["contracts/leash-wallet", "contracts/leash-registry"]
+members = ["contracts/halter-wallet", "contracts/halter-registry"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/Arashrahmaniii/leash"
+repository = "https://github.com/Arashrahmaniii/halter"
 
 [workspace.dependencies]
 near-sdk = "5.30.0"

@@ -17,7 +17,7 @@ export { teraToGas, nearToYocto, yoctoToNear, KeyPair };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(here, "..");
-export const STATE_DIR = path.resolve(process.env.LEASH_STATE_DIR || path.join(ROOT, ".leash"));
+export const STATE_DIR = path.resolve(process.env.HALTER_STATE_DIR || path.join(ROOT, ".halter"));
 export const KEYS_DIR = path.join(STATE_DIR, "keys");
 export const DEPLOYMENT_FILE = path.join(STATE_DIR, "deployment.json");
 
@@ -149,8 +149,8 @@ function findFailure(outcome) {
   return undefined;
 }
 
-/** Leash decision events from a tx's logs. */
-export function leashEvents(logs) {
+/** Halter decision events from a tx's logs. */
+export function halterEvents(logs) {
   return logs
     .filter((l) => l.startsWith("EVENT_JSON:"))
     .map((l) => {

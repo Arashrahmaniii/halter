@@ -1,5 +1,5 @@
 // End-to-end demo on testnet: an accounts-payable agent works through an inbox that contains
-// a prompt injection and an address-poisoning invoice. Leash stops both, twice: once in the
+// a prompt injection and an address-poisoning invoice. Halter stops both, twice: once in the
 // agent-side guard, and again on-chain when the attacker skips the guard.
 //
 // Usage: npm run demo                  (naive scripted agent, no API key needed)
@@ -7,9 +7,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ROOT, account, fmtNear, loadDeployment, near, sleep } from "../src/near.js";
-import { LeashWalletClient, transferAction } from "../src/wallet.js";
+import { HalterWalletClient, transferAction } from "../src/wallet.js";
 import { Scout } from "../src/scout.js";
-import { LeashGuard } from "../src/guard.js";
+import { HalterGuard } from "../src/guard.js";
 import { makeLlm } from "../src/llm.js";
 import { color, detail, info, link, step, tag } from "../src/log.js";
 
@@ -22,10 +22,10 @@ const inbox = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "inbox.json"), 
 
 const agentSigner = account(d.wallet, "agent"); // the ONLY key the agent has
 const ownerSigner = account(d.owner);
-const wallet = new LeashWalletClient(d.wallet, agentSigner);
-const ownerWallet = new LeashWalletClient(d.wallet, ownerSigner);
+const wallet = new HalterWalletClient(d.wallet, agentSigner);
+const ownerWallet = new HalterWalletClient(d.wallet, ownerSigner);
 const scout = new Scout({ walletId: d.wallet, registryId: d.registry, knownNames: known[d.network] || known.testnet });
-const guard = new LeashGuard({ wallet, scout, onWarn: "propose" });
+const guard = new HalterGuard({ wallet, scout, onWarn: "propose" });
 const llm = makeLlm();
 
 const results = [];
@@ -45,7 +45,7 @@ async function handle(inv) {
 }
 
 async function main() {
-  console.log(color.bold("\nLeash demo — an AI accounts-payable agent with a leash"));
+  console.log(color.bold("\nHalter demo — an AI accounts-payable agent on a halter"));
   info(`wallet ${d.wallet} (no full-access key; the agent holds one function-call key)`);
   info(`owner  ${d.owner}   registry ${d.registry}`);
   // Clear approvals left over from an earlier run so the queue below is this run's only.
@@ -88,7 +88,7 @@ async function main() {
   if (fourth?.dec?.receiver) {
     await sleep(1500);
     const v = await scout.check(fourth.dec.receiver);
-    info(`registry now says ${color.bold(v.facts.registry?.status)} for ${fourth.dec.receiver} — every Leash agent sees it`);
+    info(`registry now says ${color.bold(v.facts.registry?.status)} for ${fourth.dec.receiver} — every Halter agent sees it`);
   }
 
   step("Summary");

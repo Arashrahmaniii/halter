@@ -1,6 +1,6 @@
 target/
 target-linux/
 node_modules/
-agent/.leash/
+agent/.halter*/
 .env
 *.log

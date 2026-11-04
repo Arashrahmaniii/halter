@@ -1,5 +1,5 @@
-// Client for a deployed Leash Wallet contract.
-import { call, leashEvents, teraToGas, view } from "./near.js";
+// Client for a deployed Halter Wallet contract.
+import { call, halterEvents, teraToGas, view } from "./near.js";
 
 export const GAS = {
   execute: teraToGas("150"),
@@ -22,7 +22,7 @@ export const ftAction = (tokenId, receiverId, amount, memo = null) => ({
   memo,
 });
 
-export class LeashWalletClient {
+export class HalterWalletClient {
   /**
    * @param walletId the agent account the contract is deployed on
    * @param signer   near-api-js Account used to sign (agent FC key, owner, or guardian)
@@ -97,7 +97,7 @@ export class LeashWalletClient {
 
 /** Attach the final on-chain decision (from the return value or the last decision event). */
 function withDecision(r) {
-  const events = leashEvents(r.logs).filter((e) => e.standard === "leash" && e.event === "decision");
+  const events = halterEvents(r.logs).filter((e) => e.standard === "halter" && e.event === "decision");
   const last = events.at(-1)?.data?.[0];
   const outcome = r.value && typeof r.value === "object" && "status" in r.value ? r.value : undefined;
   return {

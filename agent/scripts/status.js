@@ -1,4 +1,4 @@
-// Print what the chain says about the deployed Leash wallet: keys, policy, spend, queue, decisions.
+// Print what the chain says about the deployed Halter wallet: keys, policy, spend, queue, decisions.
 // Usage: npm run status [-- --json]
 import { accessKeys, fmtNear, loadDeployment, view } from "../src/near.js";
 import { color, info, step, tag } from "../src/log.js";

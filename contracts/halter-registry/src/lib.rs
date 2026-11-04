@@ -1,10 +1,10 @@
-//! Leash Registry: a shared, evidence-backed blocklist for paying agents.
+//! Halter Registry: a shared, evidence-backed blocklist for paying agents.
 //!
-//! Anyone (a human, an agent's Leash wallet, a monitoring bot) can `report` an account with
+//! Anyone (a human, an agent's Halter wallet, a monitoring bot) can `report` an account with
 //! evidence. Reports are bonded with a small deposit so spam costs money. Curators review the
 //! evidence and `confirm` (-> Blocked) or `clear` (-> Cleared) the account.
 //!
-//! Leash wallets call `check` cross-contract before every outgoing payment:
+//! Halter wallets call `check` cross-contract before every outgoing payment:
 //! - `Blocked`  -> the wallet refuses the payment on-chain.
 //! - `Flagged`  -> the wallet parks the payment for human approval.
 //! - `Unknown` / `Cleared` -> no registry objection.
@@ -74,7 +74,7 @@ pub struct Entry {
     pub updated_at_ms: u64,
 }
 
-/// What `check` returns. Kept small and stable: Leash wallets decode it in a callback.
+/// What `check` returns. Kept small and stable: Halter wallets decode it in a callback.
 #[near(serializers = [json])]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Verdict {
@@ -219,7 +219,7 @@ impl Registry {
 
     // ---------------------------------------------------------------- views
 
-    /// The verdict Leash wallets consume. Never panics.
+    /// The verdict Halter wallets consume. Never panics.
     pub fn check(&self, account_id: AccountId) -> Verdict {
         let e = self.entries.get(&account_id).cloned().unwrap_or_else(|| empty_entry(0));
         Verdict {
@@ -307,7 +307,7 @@ fn emit(event: &str, data: near_sdk::serde_json::Value) {
     env::log_str(&format!(
         "EVENT_JSON:{}",
         near_sdk::serde_json::json!({
-            "standard": "leash-registry",
+            "standard": "halter-registry",
             "version": "1.0.0",
             "event": event,
             "data": [data],

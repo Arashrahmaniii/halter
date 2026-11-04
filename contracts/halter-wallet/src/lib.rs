@@ -1,4 +1,4 @@
-//! Leash Wallet: a policy-enforcing NEAR account for AI agents.
+//! Halter Wallet: a policy-enforcing NEAR account for AI agents.
 //!
 //! Deploy this contract on the agent's own account, give the agent a function-call key that may
 //! only call `execute` / `propose` / `report_scam` on this account, and delete the account's
@@ -35,8 +35,9 @@ const HISTORY_LEN: u64 = 100;
 const MAX_PENDING: u32 = 20;
 const MAX_MEMO_LEN: usize = 256;
 /// Call arguments are stored in the history and the approval queue, and NEAR charges storage to
-/// the wallet's own balance, so their size is capped (storage-griefing guard).
-const MAX_ARGS_LEN: usize = 2048;
+/// the wallet's own balance, so their size is capped (storage-griefing guard). With at most
+/// HISTORY_LEN + MAX_PENDING stored actions, a key holder can force well under 1 NEAR of storage.
+const MAX_ARGS_LEN: usize = 1024;
 const MAX_METHOD_LEN: usize = 64;
 const MAX_CATEGORY_LEN: usize = 32;
 const MAX_EVIDENCE_LEN: usize = 512;
@@ -355,7 +356,7 @@ enum Verdict {
 
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
-pub struct LeashWallet {
+pub struct HalterWallet {
     owner_id: AccountId,
     proposed_owner: Option<AccountId>,
     guardians: IterableSet<AccountId>,
@@ -396,7 +397,7 @@ pub fn default_policy(registry_id: Option<AccountId>) -> Policy {
 }
 
 #[near]
-impl LeashWallet {
+impl HalterWallet {
     #[init]
     pub fn new(
         owner_id: AccountId,
@@ -1148,7 +1149,13 @@ impl LeashWallet {
         d.updated_at_ms = U64(env::block_timestamp_ms());
         emit_decision(&d);
         let out = Outcome { id: U64(id), status, reasons: d.reasons.clone() };
-        self.history.insert(id, d);
+        let finished = !matches!(status, Status::Pending | Status::Checking | Status::Dispatched);
+        if finished && id + HISTORY_LEN <= self.next_id {
+            // It aged out of the history window while it was waiting; the event log keeps it.
+            self.history.remove(&id);
+        } else {
+            self.history.insert(id, d);
+        }
         out
     }
 
@@ -1208,7 +1215,7 @@ fn validate_action(action: &Action) {
         Action::FtTransfer { memo, .. } => check_memo(memo),
         Action::Call { method_name, args, .. } => {
             require!(!method_name.is_empty() && method_name.len() <= MAX_METHOD_LEN, "Method name too long");
-            require!(args.0.len() <= MAX_ARGS_LEN, "Call arguments too large (max 2048 bytes)");
+            require!(args.0.len() <= MAX_ARGS_LEN, "Call arguments too large (max 1024 bytes)");
         }
         Action::Transfer { .. } => {}
     }
@@ -1235,7 +1242,7 @@ fn validate_policy(p: &Policy) {
 fn emit(event: &str, data: serde_json::Value) {
     env::log_str(&format!(
         "EVENT_JSON:{}",
-        json!({ "standard": "leash", "version": "1.0.0", "event": event, "data": [data] })
+        json!({ "standard": "halter", "version": "1.0.0", "event": event, "data": [data] })
     ));
 }
 

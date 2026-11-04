@@ -10,13 +10,13 @@
 //   npm run owner -- deny <account>
 //   npm run owner -- rotate-key [allowance]  new agent key (old one revoked), e.g. when its gas allowance ran out
 import { account, call, fmtNear, loadDeployment, loadKey, near, newKeyPair, saveKey, teraToGas } from "../src/near.js";
-import { LeashWalletClient } from "../src/wallet.js";
+import { HalterWalletClient } from "../src/wallet.js";
 import { color, detail, info, link, tag } from "../src/log.js";
 
 const d = loadDeployment();
 const [cmd, ...args] = process.argv.slice(2);
 const owner = account(d.owner);
-const w = new LeashWalletClient(d.wallet, owner);
+const w = new HalterWalletClient(d.wallet, owner);
 
 const show = (r) => {
   if (r.decision) info(`${tag(r.decision.status)} #${r.decision.id}`), detail(r.decision.reasons);

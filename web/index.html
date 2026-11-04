@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Leash Dashboard</title>
-<meta name="description" content="Live, read-only view of a Leash agent wallet on NEAR: keys, limits, approval queue, decisions and the shared scam registry.">
+<title>Halter Dashboard</title>
+<meta name="description" content="Live, read-only view of a Halter agent wallet on NEAR: keys, limits, approval queue, decisions and the shared scam registry.">
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #5f6673; --line: #e3e6eb;
@@ -49,13 +49,13 @@
 </head>
 <body>
 <header>
-  <h1>Leash — agent wallet dashboard</h1>
+  <h1>Halter — agent wallet dashboard</h1>
   <p>Read-only view of an AI agent's NEAR wallet: what its key can do, how much it may spend, what waits for a human, and every decision the contract made.</p>
 </header>
 <main>
   <section class="panel wide">
     <form id="f">
-      <input id="wallet" placeholder="agent wallet, e.g. leash-agent-xxxx.testnet" aria-label="Wallet account">
+      <input id="wallet" placeholder="agent wallet, e.g. halter-agent-xxxx.testnet" aria-label="Wallet account">
       <input id="registry" placeholder="registry (optional, read from the wallet's policy)" aria-label="Registry account">
       <button>Load</button>
       <span id="state" class="reasons"></span>
@@ -68,7 +68,7 @@
   <section class="panel wide"><h2>Decisions (newest first)</h2><ul class="list" id="decisions"></ul></section>
   <section class="panel wide"><h2>Shared scam registry</h2><ul class="list" id="registry-list"></ul></section>
 </main>
-<footer>Data comes straight from NEAR testnet RPC. Source: <a href="https://github.com/Arashrahmaniii/leash">github.com/Arashrahmaniii/leash</a></footer>
+<footer>Data comes straight from NEAR testnet RPC. Source: <a href="https://github.com/Arashrahmaniii/halter">github.com/Arashrahmaniii/halter</a></footer>
 <script>
 const RPCS = ["https://test.rpc.fastnear.com", "https://near-testnet.drpc.org", "https://rpc.testnet.near.org"];
 const EXPLORER = "https://testnet.nearblocks.io";

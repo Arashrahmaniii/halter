@@ -1,4 +1,4 @@
-// Leash Guard: the agent-side wrapper. The agent never talks to the wallet directly; it asks
+// Halter Guard: the agent-side wrapper. The agent never talks to the wallet directly; it asks
 // the guard to pay, and the guard
 //   1. asks Scout about the receiver,
 //   2. refuses to sign on "block" (and reports clear scams to the shared registry),
@@ -12,10 +12,10 @@ import { transferAction } from "./wallet.js";
 import { fmtNear } from "./near.js";
 import { color, detail, info, link, tag } from "./log.js";
 
-export class LeashGuard {
+export class HalterGuard {
   /**
    * @param {object} o
-   * @param {import('./wallet.js').LeashWalletClient} o.wallet  wallet client signed by the agent key
+   * @param {import('./wallet.js').HalterWalletClient} o.wallet  wallet client signed by the agent key
    * @param {import('./scout.js').Scout} o.scout
    * @param {"propose"|"prompt"|"refuse"} [o.onWarn]  how to involve the human on "warn"
    * @param {boolean} [o.autoReport]  report lookalikes to the shared registry
@@ -77,7 +77,7 @@ export class LeashGuard {
     const already = report.facts?.registry?.status === "Blocked" || report.facts?.registry?.status === "Flagged";
     if (!la || already || report.facts?.exists === false) return;
     try {
-      const r = await this.wallet.reportScam(receiver, "Impersonation", `leash-scout: ${la.detail}`);
+      const r = await this.wallet.reportScam(receiver, "Impersonation", `halter-scout: ${la.detail}`);
       this.log(color.magenta(`reported ${receiver} to the shared registry`) + color.gray(" (others' agents will now see it flagged)"));
       link("tx", r.url);
     } catch (e) {

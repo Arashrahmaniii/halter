@@ -56,9 +56,9 @@ fn pay(to: &str, amount: U128) -> Action {
     Action::Transfer { receiver_id: acc(to), amount }
 }
 
-fn setup(with_registry: bool) -> LeashWallet {
+fn setup(with_registry: bool) -> HalterWallet {
     as_owner(T0_MS);
-    let mut w = LeashWallet::new(
+    let mut w = HalterWallet::new(
         acc(OWNER),
         None,
         with_registry.then(|| acc(REGISTRY)),
@@ -69,11 +69,11 @@ fn setup(with_registry: bool) -> LeashWallet {
     w
 }
 
-fn last_id(w: &LeashWallet) -> U64 {
+fn last_id(w: &HalterWallet) -> U64 {
     U64(w.get_status().next_id.0 - 1)
 }
 
-fn status_of(w: &LeashWallet) -> Status {
+fn status_of(w: &HalterWallet) -> Status {
     w.get_decision(last_id(w)).unwrap().status
 }
 
@@ -88,7 +88,7 @@ fn is_promise(r: &PromiseOrValue<Outcome>) -> bool {
     matches!(r, PromiseOrValue::Promise(_))
 }
 
-fn spent_near(w: &LeashWallet) -> u128 {
+fn spent_near(w: &HalterWallet) -> u128 {
     w.get_status().assets.iter().find(|a| a.asset == NEAR_ASSET).unwrap().spent_24h.0
 }
 
@@ -698,7 +698,7 @@ fn oversized_call_args_are_refused_before_storage() {
         Action::Call {
             contract_id: acc("x.testnet"),
             method_name: "m".into(),
-            args: Base64VecU8(vec![0u8; 50_000]),
+            args: Base64VecU8(vec![0u8; 1025]),
             deposit: U128(0),
             gas: U64(Gas::from_tgas(10).as_gas()),
         },
@@ -746,4 +746,20 @@ fn strangers_cannot_accept_ownership() {
     w.propose_owner(acc("newowner.testnet"));
     ctx("mallory.testnet", rogue_pk(), T0_MS, vec![]);
     w.accept_owner();
+}
+
+#[test]
+fn long_waiting_decisions_do_not_leak_history() {
+    let mut w = setup(false);
+    as_agent(T0_MS);
+    let parked = value(w.execute(pay("newshop.testnet", milli(10)), None)).id;
+    // Push the parked decision out of the history window while it waits.
+    for i in 0..(HISTORY_LEN + 3) {
+        as_agent(T0_MS + 1 + i);
+        w.execute(pay(ALICE, milli(5000)), None); // blocked, cheap
+    }
+    assert!(w.get_decision(parked).is_some(), "still pending, still visible");
+    as_owner(T0_MS + 1000);
+    w.reject(parked, None);
+    assert!(w.get_decision(parked).is_none(), "finished and out of the window: removed");
 }

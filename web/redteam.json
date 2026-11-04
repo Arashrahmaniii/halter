@@ -1,20 +1,20 @@
 {
   "_note": "Testnet agent key, published on purpose: it is a function-call key that can only call execute/propose/report_scam on the wallet. Try to steal the funds with it.",
   "network": "testnet",
-  "wallet": "leash-agent-of9197.testnet",
-  "registry": "registry.leash-owner-of9197.testnet",
-  "owner": "leash-owner-of9197.testnet",
-  "drainer": "drainer.leash-owner-of9197.testnet",
+  "wallet": "halter-agent-p160im.testnet",
+  "registry": "registry.halter-owner-p160im.testnet",
+  "owner": "halter-owner-p160im.testnet",
+  "drainer": "drainer.halter-owner-p160im.testnet",
   "contacts": [
-    "cloudhost.leash-owner-of9197.testnet"
+    "cloudhost.halter-owner-p160im.testnet"
   ],
-  "default_target": "drainer.leash-owner-of9197.testnet",
+  "default_target": "drainer.halter-owner-p160im.testnet",
   "people": {
-    "cloudhost": "cloudhost.leash-owner-of9197.testnet",
-    "dataapi": "dataapi.leash-owner-of9197.testnet",
-    "cl0udhost": "cl0udhost.leash-owner-of9197.testnet",
-    "drainer": "drainer.leash-owner-of9197.testnet",
-    "support-refunds": "support-refunds.leash-owner-of9197.testnet"
+    "cloudhost": "cloudhost.halter-owner-p160im.testnet",
+    "dataapi": "dataapi.halter-owner-p160im.testnet",
+    "cl0udhost": "cl0udhost.halter-owner-p160im.testnet",
+    "drainer": "drainer.halter-owner-p160im.testnet",
+    "support-refunds": "support-refunds.halter-owner-p160im.testnet"
   },
   "known_names": [
     "wrap.testnet",
@@ -25,7 +25,7 @@
     "intents.testnet"
   ],
   "agent_key": {
-    "public_key": "ed25519:HEdqqN9giTfdaQfsS84uNgmnKptJMVxTBEgTQ1H9odtK",
-    "private_key": "ed25519:3bMnn3a1CVkq8G43X69ao7aKQ3BrSUxbrsddig47nCyu1fdJV7jBDkpbD3uw24GiwP8GvK7hBi5KG9AiMPFEngZD"
+    "public_key": "ed25519:Dwdtu1AKPJ7MWmzBo94nMCHz46twDnPom4DvLRnaxcXc",
+    "private_key": "ed25519:UPaEEXxwoMVzquRrgpbB6SaWurSZmusaprrnPKRgTmJPLNBJHGLTWt3NfCHU4fKUSbkZMpF85k1x5jgpRDNxHXp"
   }
 }

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  contracts:
+    name: Contracts (cargo test + wasm build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Unit tests (registry + wallet)
+        run: cargo test
+      - name: Build wasm
+        run: cargo build --target wasm32-unknown-unknown --release
+      - name: Built wasm matches the committed res/ (informational)
+        run: |
+          for f in halter_wallet halter_registry; do
+            ls -l target/wasm32-unknown-unknown/release/$f.wasm res/$f.wasm
+          done
+
+  agent:
+    name: Agent (Scout tests, MCP server boots)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agent/package-lock.json
+      - run: npm ci
+      - name: Scout tests
+        run: npm test
+      - name: Syntax check of every script
+        run: for f in src/*.js scripts/*.js; do node --check "$f"; done
