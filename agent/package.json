@@ -5,14 +5,15 @@
     "test": "node --test \"test/**/*.test.js\"",
     "build:contracts": "cd .. && cargo build --target wasm32-unknown-unknown --release && node -e \"for (const f of ['halter_wallet','halter_registry']) require('fs').copyFileSync('target/wasm32-unknown-unknown/release/'+f+'.wasm','res/'+f+'.wasm')\"",
     "setup": "node scripts/setup.js",
-    "demo": "node scripts/demo.js",
+    "demo": "node --env-file-if-exists=.env scripts/demo.js",
     "attacks": "node scripts/attacks.js",
     "status": "node scripts/status.js",
     "owner": "node scripts/owner.js",
     "scout": "node scripts/scout.js",
     "publish-key": "node scripts/publish-key.js",
-    "mcp": "node scripts/mcp.js",
-    "mcp:smoke": "node scripts/mcp-smoke.js"
+    "mcp": "node --env-file-if-exists=.env scripts/mcp.js",
+    "mcp:smoke": "node scripts/mcp-smoke.js",
+    "llm:eval": "node --env-file-if-exists=.env scripts/llm-eval.js"
   },
   "license": "MIT",
   "type": "module",

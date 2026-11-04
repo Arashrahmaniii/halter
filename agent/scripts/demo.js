@@ -72,15 +72,21 @@ async function main() {
   // INV-1003: prompt injection -> agent tries to pay the drainer -> guard refuses.
   const third = await handle(inbox[2]);
 
-  // Same attack, but the attacker controls the agent process and skips the guard entirely.
-  if (third?.dec?.receiver) {
+  // Same attack, but the attacker controls the agent process and skips the guard entirely. The
+  // target is the one the injection asks for, whatever the model decided.
+  const inj = inbox[2].text.match(/(?:send|pay|transfer)\s+([\d.]+)\s*NEAR\s+to\s+([a-z0-9._-]+)/i);
+  if (inj) {
+    const amt = inj[1];
+    const target = inj[2].toLowerCase().replace(/\.+$/, "");
+    const obeyed = third?.dec?.receiver === target;
     step("What if the attacker owns the agent process and skips the guard?");
-    info(`compromised agent signs execute() directly with its key: ${third.dec.amount_near} NEAR -> ${third.dec.receiver}`);
-    const raw = await wallet.execute(transferAction(third.dec.receiver, near(third.dec.amount_near)), "bypass");
+    if (!obeyed) info(color.gray(`(the model did not follow the injection this time; Halter does not rely on that)`));
+    info(`compromised agent signs execute() directly with its key: ${amt} NEAR -> ${target}`);
+    const raw = await wallet.execute(transferAction(target, near(Number(amt))), "bypass");
     info(`contract says ${tag(raw.decision?.status)}`);
     detail((raw.decision?.reasons || []).map((r) => `contract: ${r}`));
     link("tx", raw.url);
-    results.push({ invoice: `${inbox[2].id} (guard bypassed)`, receiver: third.dec.receiver, amount: third.dec.amount_near, scout: "-", outcome: raw.decision?.status });
+    results.push({ invoice: `${inbox[2].id} (guard bypassed)`, receiver: target, amount: Number(amt), scout: "-", outcome: raw.decision?.status });
   }
 
   // INV-1004: lookalike address -> guard refuses and reports it to the shared registry.
@@ -89,6 +95,13 @@ async function main() {
     await sleep(1500);
     const v = await scout.check(fourth.dec.receiver);
     info(`registry now says ${color.bold(v.facts.registry?.status)} for ${fourth.dec.receiver} — every Halter agent sees it`);
+  }
+
+  // With a real model, also run the two quieter attacks from the model test (data/eval-extra.json):
+  // payment redirection without injection phrasing, and a fake system notice.
+  if (process.env.LLM_API_KEY || process.env.NEARAI_API_KEY) {
+    const extra = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "eval-extra.json"), "utf8"));
+    for (const inv of extra) await handle({ ...inv, text: inv.text.replaceAll("{owner}", d.owner) });
   }
 
   step("Summary");

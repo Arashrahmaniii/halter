@@ -33,22 +33,52 @@ export class ChatLlm {
   }
 
   async decide(invoiceText) {
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
-      body: JSON.stringify({
-        model: this.model,
-        temperature: 0,
-        max_tokens: 400,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: invoiceText },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error(`LLM HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const j = await res.json();
-    return parseDecision(j.choices?.[0]?.message?.content || "");
+    const payload = {
+      model: this.model,
+      temperature: this.noTemperature ? undefined : 0,
+      max_tokens: 4000, // reasoning models spend tokens before the JSON answer
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: invoiceText },
+      ],
+    };
+    const body = JSON.stringify(payload);
+    // Network hiccups and 429/5xx are retried; a 4xx answer (bad key, unknown model) is not.
+    let last;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 1500 * 2 ** (attempt - 1)));
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 90_000);
+      try {
+        const res = await fetch(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
+          body,
+          signal: ctrl.signal,
+        });
+        if (res.status === 429 || res.status >= 500) {
+          last = new Error(`LLM HTTP ${res.status}`);
+          continue;
+        }
+        if (!res.ok) {
+          const text = (await res.text()).slice(0, 300);
+          // Some models only accept their default temperature; retry once without it.
+          if (res.status === 400 && /temperature/i.test(text) && !this.noTemperature) {
+            this.noTemperature = true;
+            return this.decide(invoiceText);
+          }
+          throw Object.assign(new Error(`LLM HTTP ${res.status}: ${text.slice(0, 200)}`), { final: true });
+        }
+        const j = await res.json();
+        return parseDecision(j.choices?.[0]?.message?.content || "");
+      } catch (e) {
+        if (e.final) throw e;
+        last = e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw last;
   }
 }
 

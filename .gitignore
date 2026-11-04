@@ -3,4 +3,5 @@ target-linux/
 node_modules/
 agent/.halter*/
 .env
+**/.env
 *.log
