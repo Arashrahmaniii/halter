@@ -1,0 +1,25 @@
+{
+  "_comment": "Well-known NEAR accounts that scammers like to imitate. Scout flags lookalikes of these and of the wallet's own contacts.",
+  "mainnet": [
+    "wrap.near",
+    "usdt.tether-token.near",
+    "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+    "intents.near",
+    "v2.ref-finance.near",
+    "app.rhea-finance.near",
+    "meta-pool.near",
+    "linear-protocol.near",
+    "aurora",
+    "token.sweat",
+    "social.near",
+    "relay.aurora"
+  ],
+  "testnet": [
+    "wrap.testnet",
+    "usdc.fakes.testnet",
+    "usdt.fakes.testnet",
+    "v1.signer-prod.testnet",
+    "outlayer.testnet",
+    "intents.testnet"
+  ]
+}

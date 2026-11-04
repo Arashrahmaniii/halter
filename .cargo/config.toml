@@ -1,0 +1,7 @@
+# Native unit tests on the windows-gnu toolchain: avoid raw-dylib (needs an assembler).
+[target.x86_64-pc-windows-gnu]
+rustflags = ["--cfg", 'getrandom_backend="windows_legacy"']
+
+# On-chain builds: near-sdk needs cfg(near) to use the real host functions.
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", "near", "-C", "link-arg=-s"]

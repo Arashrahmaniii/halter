@@ -1,0 +1,6 @@
+target/
+target-linux/
+node_modules/
+agent/.leash/
+.env
+*.log
